@@ -1,0 +1,5 @@
+arxiv==1.4.2
+PyPDF2==2.11.1
+requests==2.26.0
+baml-py==0.56.1
+pydantic==2.9.2

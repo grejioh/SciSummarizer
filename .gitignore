@@ -1,0 +1,4 @@
+__pycache__/
+baml_client/
+data/
+.env
