@@ -28,6 +28,10 @@ class ArxivFetcher:
             sort_by=self.sort_by
         )
 
+        papers = self.getPapersFromSearch(search)
+        return papers
+
+    def getPapersFromSearch(self, search):
         papers = []
         for result in search.results():
             paper = {
@@ -42,6 +46,17 @@ class ArxivFetcher:
 
         self.logger.info(f"Fetched {len(papers)} papers")
         return papers
+    
+    def fetch_papers_byIdList(self, id_list: List[str]) -> List[Dict[str, Any]]:
+        search = arxiv.Search(
+            id_list=id_list,
+            sort_by=self.sort_by
+        )
+
+        papers = self.getPapersFromSearch(search)
+        return papers
+
+
 
     def sanitize_filename(self, filename: str) -> str:
         """

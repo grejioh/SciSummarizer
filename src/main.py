@@ -23,7 +23,7 @@ def parse_arguments() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Summarize arXiv papers")
     parser.add_argument("keyword", help="Keyword to search for papers")
-    parser.add_argument("--max-results", type=int, default=2, help="Maximum number of papers to process")
+    parser.add_argument("--max-results", type=int, default=10, help="Maximum number of papers to process")
     return parser.parse_args()
 
 async def save_summaries_to_json(summaries: List[Summary], keyword: str) -> None:
@@ -37,8 +37,8 @@ async def save_summaries_to_json(summaries: List[Summary], keyword: str) -> None
     Raises:
         IOError: If there's an error writing to the file.
     """
-    os.makedirs("data/json", exist_ok=True)
-    file_path = f"data/json/summaries_{keyword}.json"
+    os.makedirs(f"data/{keyword}", exist_ok=True)
+    file_path = f"data/{keyword}/{keyword}.json"
     
     try:
         with open(file_path, "w") as file:
@@ -61,7 +61,7 @@ async def process_paper(fetcher: ArxivFetcher, processor: PDFProcessor, paper: d
     Returns:
         Optional[Summary]: Generated summary or None if processing failed.
     """
-    pdf_path = await fetcher.download_pdf(paper, f"data/pdfs/{keyword}")
+    pdf_path = await fetcher.download_pdf(paper, f"data/{keyword}/pdfs")
     if pdf_path:
         try:
             paper_content = processor.extract_text_from_fisrt_N_pages(pdf_path, 2)
@@ -72,8 +72,8 @@ async def process_paper(fetcher: ArxivFetcher, processor: PDFProcessor, paper: d
 
 async def save_summaries_to_md(summaries: List[Summary], keyword: str) -> None:
     try:
-        os.makedirs("data/md", exist_ok=True)
-        file_path = f"data/md/summaries_{keyword}.md"
+        os.makedirs(f"data/{keyword}", exist_ok=True)
+        file_path = f"data/{keyword}/{keyword}.md"
         with open(file_path, "w") as file:
             file.write(SummariesToMDConverter(2).from_summaries(summaries, keyword))
         logging.info(f"Summaries saved to {file_path}")
@@ -90,7 +90,15 @@ async def main():
     fetcher = ArxivFetcher(max_results=args.max_results, sort_by=arxiv.SortCriterion.SubmittedDate)
     processor = PDFProcessor()
     
-    papers = fetcher.fetch_papers(args.keyword)
+    idlist = []
+    try:
+        with open(f"./data/{args.keyword}/id.txt", "r") as file:
+            for line in file:
+                idlist.append(line.strip())
+    except FileNotFoundError:
+        logging.error(f"File ./data/{args.keyword}/id.txt not found.")
+
+    papers = fetcher.fetch_papers_byIdList(idlist)
     
     tasks = [process_paper(fetcher, processor, paper, args.keyword) for paper in papers]
     summaries = await asyncio.gather(*tasks)

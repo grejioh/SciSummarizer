@@ -9,19 +9,21 @@ class SummariesToMDConverter:
 
     def indexedItems(self, title: str, items: List[str]) -> str:
         temp_title_level = self.title_level + 1
-        temp_content = ('#'*temp_title_level) + ' ' + title + "\n\n"
+        temp_content = ('#'*temp_title_level) + ' ' + title + "\n"
 
         for i, item in enumerate(items, 1):
             temp_content += f"{i}. {item}\n"
-        temp_content += "\n"
         return temp_content
 
     def from_summaries(self, summaries: List[Summary], keyword: str) -> None:
         md_content = ""
         for summary in summaries:
-            md_content += f"## {summary.title}\n\n"
+            md_content += f"## {summary.title}\n"
+            md_content += summary.chinese_title+"\n";
             if summary.repo:
-                md_content += f"代码：{summary.repo}\n\n"
+                md_content += f"代码：{summary.repo}\n"
+            md_content += ('#'*(1+self.title_level)) + ' ' + "文章解析" + "\n"
+            md_content += summary.core_ideas_summary + "\n";
             
             md_content += self.indexedItems("创新点", summary.innovations);
             md_content += self.indexedItems("研究方法", summary.methodology);

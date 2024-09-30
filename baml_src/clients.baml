@@ -15,6 +15,8 @@ client<llm> AFallbackClient {
   options {
     strategy [
       QwenPlusLatest
+      QwenPlus0919
+      QwenPlus0806
       QwenPlus
     ]
   }
@@ -26,6 +28,26 @@ client<llm> QwenPlusLatest {
   options {
     base_url "https://dashscope.aliyuncs.com/compatible-mode/v1"
     model "qwen-plus-latest"
+    api_key env.QWEN_API_KEY
+    default_role "user"
+  }
+}
+
+client<llm> QwenPlus0919 {
+  provider "openai-generic"
+  options {
+    base_url "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    model "qwen-plus-2024-09-19"
+    api_key env.QWEN_API_KEY
+    default_role "user"
+  }
+}
+
+client<llm> QwenPlus0806 {
+  provider "openai-generic"
+  options {
+    base_url "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    model "qwen-plus-2024-08-06"
     api_key env.QWEN_API_KEY
     default_role "user"
   }
