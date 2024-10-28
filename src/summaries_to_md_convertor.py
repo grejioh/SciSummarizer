@@ -22,6 +22,7 @@ class SummariesToMDConverter:
         for summary in summaries:
             md_content += f"## {summary.title}\n"
             md_content += summary.chinese_title + "\n"
+            md_content += "论文：\n"
             if summary.repo:
                 md_content += f"代码：{summary.repo}\n"
             md_content += ("#" * (1 + self.title_level)) + " " + "文章解析" + "\n"

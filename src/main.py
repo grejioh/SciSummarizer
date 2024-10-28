@@ -16,7 +16,7 @@ from baml_client.types import Summary
 from arxiv_fetcher import ArxivFetcher
 from pdf_processor import PDFProcessor
 from summaries_to_md_convertor import SummariesToMDConverter
-
+from pdf2img import pdf_to_images
 
 def setup_logging():
     """Setup basic logging configuration."""
@@ -139,7 +139,21 @@ async def main():
         logging.error(
             "Failed to save summaries. Continuing with the rest of the program."
         )
+    # 选择一个PDF文件并转换为图像
+    convert_one_pdf_to_img(args)
 
+def convert_one_pdf_to_img(args):
+    try:
+        pdf_folder = f"./data/{args.keyword}/pdfs"
+        pdf_files = [f for f in os.listdir(pdf_folder) if f.endswith('.pdf')]
+        if pdf_files:
+            selected_pdf = os.path.join(pdf_folder, pdf_files[0])
+            pdf_to_images(selected_pdf)
+            logging.info(f"已将PDF文件 {selected_pdf} 转换为图像，保存在同文件夹下")
+        else:
+            logging.warning(f"在 {pdf_folder} 中未找到PDF文件")
+    except Exception as e:
+        logging.error(f"PDF转图像过程中出错: {str(e)}")
 
 if __name__ == "__main__":
     asyncio.run(main())

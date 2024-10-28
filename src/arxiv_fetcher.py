@@ -21,6 +21,7 @@ class ArxivFetcher:
         self.max_results = max_results
         self.sort_by = sort_by
         self.logger = logging.getLogger(__name__)
+        self.client = arxiv.Client()
 
     def fetch_papers(self, keyword: str) -> List[Dict[str, Any]]:
         """
@@ -36,7 +37,7 @@ class ArxivFetcher:
 
     def getPapersFromSearch(self, search):
         papers = []
-        for result in search.results():
+        for result in self.client.results(search):
             paper = {
                 "title": result.title,
                 "authors": [author.name for author in result.authors],
@@ -99,27 +100,50 @@ class ArxivFetcher:
 
         self.logger.info(f"Downloading PDF: {filename}")
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(pdf_url) as response:
-                if response.status == 200:
-                    async with aiofiles.open(filepath, "wb") as f:
-                        await f.write(await response.read())
-                    self.logger.info(f"PDF downloaded: {filepath}")
-                    return filepath
-                else:
-                    self.logger.error(f"Failed to download PDF: {pdf_url}")
-                    return None
+        connector = aiohttp.TCPConnector(ssl=False)
+        async with aiohttp.ClientSession(connector=connector) as session:
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    # todo check proxy
+                    async with session.get(pdf_url, proxy="socks5://127.0.0.1:7890") as response:
+                        if response.status == 200:
+                            async with aiofiles.open(filepath, "wb") as f:
+                                await f.write(await response.read())
+                            file_size = os.path.getsize(filepath)
+                            if file_size >= 10 * 1024:  # 大于等于10KB
+                                self.logger.info(f"PDF 下载成功: {filepath}，大小: {file_size} 字节")
+                                return filepath
+                            else:
+                                self.logger.warning(f"下载的PDF可能无效: {filepath}，大小: {file_size} 字节")
+                                if attempt < max_retries - 1:
+                                    self.logger.info(f"尝试重新下载 PDF: {filename}，第 {attempt + 2} 次")
+                                else:
+                                    self.logger.error(f"多次尝试后仍无法下载有效的PDF: {filepath}")
+                                    return None
+                        else:
+                            self.logger.error(f"下载PDF失败: {pdf_url}，状态码: {response.status}")
+                            if attempt < max_retries - 1:
+                                self.logger.info(f"尝试重新下载 PDF: {filename}，第 {attempt + 2} 次")
+                            else:
+                                return None
+                except aiohttp.ClientError as e:
+                    self.logger.error(f"连接错误: {str(e)}")
+                    if attempt < max_retries - 1:
+                        self.logger.info(f"尝试重新下载 PDF: {filename}，第 {attempt + 2} 次")
+                    else:
+                        return None
 
 
 # Example usage
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     fetcher = ArxivFetcher(max_results=3, sort_by=arxiv.SortCriterion.SubmittedDate)
-    keywords = "quantum computing"
-    papers = fetcher.fetch_papers(keywords)
+    id = ["2410.03537"]
+    papers = fetcher.fetch_papers_byIdList(id)
     for paper in papers:
-        pdf_path = fetcher.download_pdf(
+        pdf_path = asyncio.run(fetcher.download_pdf(
             paper,
-        )
+        ))
         if pdf_path:
             print(f"Downloaded: {pdf_path}")
