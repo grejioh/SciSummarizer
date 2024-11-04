@@ -17,6 +17,7 @@ from arxiv_fetcher import ArxivFetcher
 from pdf_processor import PDFProcessor
 from summaries_to_md_convertor import SummariesToMDConverter
 from pdf2img import pdf_to_images
+import glob
 
 def setup_logging():
     """Setup basic logging configuration."""
@@ -65,10 +66,10 @@ async def save_summaries_to_json(summaries: List[Summary], keyword: str) -> None
         logging.error(f"Error saving summaries to {file_path}: {e}")
         raise
 
+async def download_pdf(fetcher: ArxivFetcher, paper: dict, keyword: str):
+    await fetcher.download_pdf(paper, f"data/{keyword}/pdfs")
 
-async def process_paper(
-    fetcher: ArxivFetcher, processor: PDFProcessor, paper: dict, keyword: str
-) -> Optional[Summary]:
+async def summarize_paper(pdf_path: str, processor: PDFProcessor) -> Optional[Summary]:
     """
     Process a single paper: download PDF, extract text, and generate summary.
 
@@ -81,13 +82,12 @@ async def process_paper(
     Returns:
         Optional[Summary]: Generated summary or None if processing failed.
     """
-    pdf_path = await fetcher.download_pdf(paper, f"data/{keyword}/pdfs")
     if pdf_path:
         try:
             paper_content = processor.extract_text_from_fisrt_N_pages(pdf_path, 2)
             return await b.SummaryPaper(paper_content)
         except Exception as e:
-            logging.error(f"Error processing paper {paper['title']}: {e}")
+            logging.error(f"Error processing paper : {e}")
     return None
 
 
@@ -120,10 +120,14 @@ async def main():
     except FileNotFoundError:
         logging.error(f"File ./data/{args.keyword}/id.txt not found.")
 
-    papers = fetcher.fetch_papers_byIdList(idlist)
+    if idlist:
+        papers = fetcher.fetch_papers_byIdList(idlist)
+        pdf_download_tasks = [download_pdf(fetcher, paper, args.keyword) for paper in papers]
+        await asyncio.gather(*pdf_download_tasks)
 
-    tasks = [process_paper(fetcher, processor, paper, args.keyword) for paper in papers]
-    summaries = await asyncio.gather(*tasks)
+    pdf_paths = glob.glob(f"./data/{args.keyword}/pdfs/*.pdf")
+    summary_tasks = [summarize_paper(pdf_path, processor) for pdf_path in pdf_paths]
+    summaries = await asyncio.gather(*summary_tasks)
     summaries = [summary for summary in summaries if summary is not None]
 
     try:
