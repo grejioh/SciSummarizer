@@ -19,6 +19,11 @@ from summaries_to_md_convertor import SummariesToMDConverter
 from pdf2img import pdf_to_images
 import glob
 
+class SummaryWithPath:
+    def __init__(self, summary: Summary, pdf_path: str):
+        self.summary = summary
+        self.pdf_path = pdf_path
+
 def setup_logging():
     """Setup basic logging configuration."""
     logging.basicConfig(
@@ -39,7 +44,7 @@ def parse_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
-async def save_summaries_to_json(summaries: List[Summary], keyword: str) -> None:
+async def save_summaries_to_json(summaries: List[SummaryWithPath], keyword: str) -> None:
     """
     Save summaries to a JSON file.
 
@@ -56,7 +61,7 @@ async def save_summaries_to_json(summaries: List[Summary], keyword: str) -> None
     try:
         with open(file_path, "w") as file:
             json.dump(
-                [summary.model_dump() for summary in summaries],
+                [summary.summary.model_dump() for summary in summaries],
                 file,
                 indent=2,
                 ensure_ascii=False,
@@ -84,19 +89,20 @@ async def summarize_paper(pdf_path: str, processor: PDFProcessor) -> Optional[Su
     """
     if pdf_path:
         try:
-            paper_content = processor.extract_text_from_fisrt_N_pages(pdf_path, 2)
+            paper_content = processor.extract_text_from_fisrt_N_pages(pdf_path, 2).encode('utf-8', 'ignore').decode()
             return await b.SummaryPaper(paper_content)
         except Exception as e:
             logging.error(f"Error processing paper : {e}")
     return None
 
 
-async def save_summaries_to_md(summaries: List[Summary], keyword: str) -> None:
+async def save_summaries_to_md(summaries: List[SummaryWithPath], keyword: str) -> None:
     try:
         os.makedirs(f"data/{keyword}", exist_ok=True)
         file_path = f"data/{keyword}/{keyword}.md"
+        real_summaries = [summary.summary for summary in summaries]
         with open(file_path, "w") as file:
-            file.write(SummariesToMDConverter(2).from_summaries(summaries, keyword))
+            file.write(SummariesToMDConverter(2).from_summaries(real_summaries, keyword))
         logging.info(f"Summaries saved to {file_path}")
     except IOError as e:
         logging.error(f"Error saving summaries to {file_path}: {e}")
@@ -126,9 +132,11 @@ async def main():
         await asyncio.gather(*pdf_download_tasks)
 
     pdf_paths = glob.glob(f"./data/{args.keyword}/pdfs/*.pdf")
+
+
     summary_tasks = [summarize_paper(pdf_path, processor) for pdf_path in pdf_paths]
     summaries = await asyncio.gather(*summary_tasks)
-    summaries = [summary for summary in summaries if summary is not None]
+    summaries = [SummaryWithPath(summary, pdf_path) for summary, pdf_path in zip(summaries, pdf_paths) if summary is not None]
 
     try:
         await save_summaries_to_json(summaries, args.keyword)
@@ -144,18 +152,17 @@ async def main():
             "Failed to save summaries. Continuing with the rest of the program."
         )
     # 选择一个PDF文件并转换为图像
-    convert_one_pdf_to_img(args)
+    convert_one_pdf_to_img(summaries)
 
-def convert_one_pdf_to_img(args):
+def convert_one_pdf_to_img(summaries: List[SummaryWithPath]):
     try:
-        pdf_folder = f"./data/{args.keyword}/pdfs"
-        pdf_files = [f for f in os.listdir(pdf_folder) if f.endswith('.pdf')]
-        if pdf_files:
-            selected_pdf = os.path.join(pdf_folder, pdf_files[0])
-            pdf_to_images(selected_pdf)
-            logging.info(f"已将PDF文件 {selected_pdf} 转换为图像，保存在同文件夹下")
-        else:
-            logging.warning(f"在 {pdf_folder} 中未找到PDF文件")
+        for summary in summaries:
+            if summary.summary.repo:
+                pdf_to_images(summary.pdf_path)
+                logging.info(f"已将PDF文件 {summary.pdf_path} 转换为图像，保存在同文件夹下")
+                return
+        pdf_to_images(summaries[0].pdf_path)
+        logging.info(f"已将第一个PDF文件 {summaries[0].pdf_path} 转换为图像，保存在同文件夹下")
     except Exception as e:
         logging.error(f"PDF转图像过程中出错: {str(e)}")
 

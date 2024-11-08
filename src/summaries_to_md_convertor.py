@@ -1,7 +1,7 @@
 import logging
 from typing import List
 
-from baml_client.partial_types import Summary
+from baml_client.types import Summary
 
 
 class SummariesToMDConverter:
@@ -17,7 +17,7 @@ class SummariesToMDConverter:
             temp_content += f"{i}. {item}\n"
         return temp_content
 
-    def from_summaries(self, summaries: List[Summary], keyword: str) -> None:
+    def from_summaries(self, summaries: List[Summary], keyword: str) -> str:
         md_content = ""
         for summary in summaries:
             md_content += f"## {summary.title}\n"
